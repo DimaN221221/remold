@@ -85,9 +85,10 @@ def main() -> None:
     args.append("--onefile" if onefile else "--onedir")
     PyInstaller.__main__.run(args)
     shutil.rmtree(ROOT / "build", ignore_errors=True)  # проміжні файли PyInstaller
-    print("\nГотово:", ROOT / "dist" / (f"{NAME}.exe" if onefile else f"{NAME}\\{NAME}.exe"))
+    # англійською: консоль CI (GitHub Actions) працює в cp1252 і не виводить кирилицю
+    print("\nBuilt:", ROOT / "dist" / (f"{NAME}.exe" if onefile else f"{NAME}\\{NAME}.exe"))
     if "--zip" in sys.argv and not onefile:
-        print("Архів для релізу:", make_zip())
+        print("Release archive:", make_zip())
 
 
 if __name__ == "__main__":
