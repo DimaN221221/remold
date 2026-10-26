@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>Remold</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- SVG-іконки (штрихові, 1.6px), використовуються через <use href="#i-…"> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+    <symbol id="i-batch" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M20 7h-9M14 17H4"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 4v4.5h-4.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l11-7Z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h9.5A8.5 8.5 0 0 1 21 11.5V21H3Z"/><rect x="7" y="11" width="6" height="6"/></svg>
+      <div><b>Remold</b><span class="ver" id="ver"></span></div>
+    </div>
+    <nav>
+      <button class="nav-btn" data-tab="conv"><svg class="ic"><use href="#i-queue"/></svg><span data-i18n="nav.conv"></span><kbd>1</kbd></button>
+      <button class="nav-btn" data-tab="batch"><svg class="ic"><use href="#i-batch"/></svg><span data-i18n="nav.batch"></span><kbd>2</kbd></button>
+      <button class="nav-btn" data-tab="hist"><svg class="ic"><use href="#i-history"/></svg><span data-i18n="nav.hist"></span><kbd>3</kbd></button>
+      <button class="nav-btn" data-tab="settings"><svg class="ic"><use href="#i-settings"/></svg><span data-i18n="nav.settings"></span><span class="dot-badge" id="upd-dot" hidden></span><kbd>4</kbd></button>
+    </nav>
+    <div class="rail-foot"><svg class="ic sm"><use href="#i-lock"/></svg><span data-i18n="side.note"></span></div>
+  </aside>
+
+  <div class="stage">
+    <div class="update-bar" id="update-bar" hidden>
+      <svg class="ic sm"><use href="#i-refresh"/></svg>
+      <span id="update-text"></span>
+      <button class="link" id="update-go"></button>
+      <button class="link mute" id="update-later" data-i18n="upd.later"></button>
+    </div>
+
+    <!-- 1. Конвертер -->
+    <main class="screen conv" id="screen-conv">
+      <header class="head">
+        <h1 data-i18n="conv.title"></h1>
+        <span class="count" id="summary"></span>
+        <button class="btn ghost" id="btn-add"><svg class="ic sm"><use href="#i-plus"/></svg><span data-i18n="conv.add"></span></button>
+      </header>
+
+      <div class="drop" id="dropzone" tabindex="0">
+        <svg class="ic"><use href="#i-upload"/></svg>
+        <div class="drop-text"><b data-i18n="drop.title"></b> <span data-i18n="drop.browse"></span></div>
+        <div class="drop-types" data-i18n="drop.types"></div>
+      </div>
+
+      <div class="table" id="table">
+        <div class="thead">
+          <span></span><span data-i18n="col.file"></span><span data-i18n="col.size" class="num"></span>
+          <span data-i18n="col.to"></span><span data-i18n="col.status" class="num"></span>
+        </div>
+        <div class="tbody" id="queue"></div>
+      </div>
+
+      <footer class="foot">
+        <button class="out" id="out-pill">
+          <svg class="ic sm"><use href="#i-folder"/></svg>
+          <span class="label" data-i18n="out.label"></span><span class="help" tabindex="0" data-tip="outDir">?</span>
+          <span class="path" id="out-pill-path"></span>
+          <span class="x" id="out-pill-x" role="button" data-i18n-title="out.reset"><svg class="ic xs"><use href="#i-x"/></svg></span>
+        </button>
+        <button class="btn ghost" id="btn-reset" data-i18n="btn.clear"></button>
+        <button class="btn primary" id="btn-run"><svg class="ic sm" id="run-ic"><use href="#i-play"/></svg><span id="run-label"></span><kbd>Ctrl ⏎</kbd></button>
+      </footer>
+      <div class="toast" id="toast" role="status"></div>
+    </main>
+
+    <!-- 2. Пакетна обробка -->
+    <main class="screen page" id="screen-batch">
+      <header class="head"><h1 data-i18n="batch.title"></h1></header>
+      <p class="lede" data-i18n="batch.desc"></p>
+      <div class="list" id="rules"></div>
+      <div class="grid2">
+        <div class="field clickable" id="out-card">
+          <div class="caps"><span data-i18n="batch.outDir"></span><span class="help" tabindex="0" data-tip="outDir">?</span></div>
+          <div class="mono-val" id="out-dir"></div>
+          <div class="hint" id="out-hint"></div>
+        </div>
+        <div class="field">
+          <div class="caps"><span data-i18n="batch.nameTpl"></span><span class="help" tabindex="0" data-tip="nameTpl">?</span></div>
+          <input class="mono-val tpl" id="name-tpl" spellcheck="false">
+          <div class="hint" data-i18n="batch.tokens"></div>
+        </div>
+      </div>
+      <div><button class="btn primary" id="btn-apply" data-i18n="batch.apply"></button></div>
+    </main>
+
+    <!-- 3. Історія -->
+    <main class="screen page" id="screen-hist">
+      <header class="head">
+        <h1><span data-i18n="hist.title"></span><span class="help" tabindex="0" data-tip="history">?</span></h1>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="btn-clear-hist" data-i18n="hist.clear"></button>
+      </header>
+      <div class="list" id="hist"></div>
+    </main>
+
+    <!-- 4. Налаштування -->
+    <main class="screen page" id="screen-settings">
+      <header class="head"><h1 data-i18n="set.title"></h1></header>
+      <div class="list settings">
+        <div class="set-row">
+          <div><b data-i18n="set.lang"></b><p data-i18n="set.langDesc"></p></div>
+          <div class="seg" id="seg-lang"><button data-lang="uk">Українська</button><button data-lang="en">English</button></div>
+        </div>
+        <div class="set-row">
+          <div><b data-i18n="set.theme"></b><p data-i18n="set.themeDesc"></p></div>
+          <div class="seg" id="seg-theme">
+            <button data-theme-btn="light" data-i18n="set.light"></button>
+            <button data-theme-btn="dark" data-i18n="set.dark"></button>
+            <button data-theme-btn="system" data-i18n="set.system"></button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><b><span data-i18n="set.menu"></span><span class="help" tabindex="0" data-tip="menu">?</span></b><p data-i18n="set.menuDesc"></p></div>
+          <button class="switch" id="sw-menu" role="switch"><span></span></button>
+        </div>
+        <div class="set-row">
+          <div><b><span data-i18n="set.auto"></span><span class="help" tabindex="0" data-tip="auto">?</span></b><p data-i18n="set.autoDesc"></p></div>
+          <button class="switch" id="sw-auto" role="switch"><span></span></button>
+        </div>
+        <div class="set-row">
+          <div><b data-i18n="set.updates"></b><p id="upd-info"></p><p id="upd-status" class="status-line"></p></div>
+          <div class="row-actions">
+            <button class="btn ghost" id="btn-check"><svg class="ic sm"><use href="#i-refresh"/></svg><span data-i18n="set.check"></span></button>
+            <button class="btn primary" id="btn-install" hidden></button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><b>Remold</b><p id="about-ver"></p></div>
+          <button class="btn ghost" id="btn-repo"><span data-i18n="set.repo"></span><svg class="ic sm"><use href="#i-external"/></svg></button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <aside class="inspector" id="panel"></aside>
+</div>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

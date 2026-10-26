@@ -1,0 +1,38 @@
+# Збирає Remold для Windows і публікує реліз, коли пушиться тег vX.Y.Z.
+# Архів Remold-windows-x64.zip і його .sha256 — саме ці файли завантажує вбудований оновлювач.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Check that the tag matches version.py
+        run: |
+          $v = python -c "import version; print(version.__version__)"
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "Tag ${{ github.ref_name }} does not match version.py ($v)" }
+
+      - name: Build
+        run: python build.py --zip
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Remold-windows-x64.zip
+            dist/Remold-windows-x64.zip.sha256
+          generate_release_notes: true

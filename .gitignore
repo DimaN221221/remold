@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.spec
+.venv/
+venv/
+.idea/
+.vscode/
+
+# дизайн-макети (локальні референси, не частина програми)
+design_handoff_file_converter/
