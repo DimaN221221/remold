@@ -64,7 +64,16 @@ def main() -> int:
                         help="convert next to the original with a small progress window (used by the Explorer menu)")
     parser.add_argument("--register-menu", action="store_true", help="add “Convert to” to the Explorer context menu")
     parser.add_argument("--unregister-menu", action="store_true", help="remove it from the Explorer context menu")
+    # службовий режим оновлювача: так запускається завантажена нова версія (див. updater.apply_on_exit)
+    parser.add_argument("--apply-update", metavar="DIR", help=argparse.SUPPRESS)
+    parser.add_argument("--target", help=argparse.SUPPRESS)
+    parser.add_argument("--wait-pid", type=int, default=0, help=argparse.SUPPRESS)
+    parser.add_argument("--restart", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+
+    if args.apply_update and args.target:
+        import updater
+        return updater.apply_staged(Path(args.apply_update), Path(args.target), args.wait_pid, args.restart)
 
     if args.register_menu or args.unregister_menu:
         import shell_menu

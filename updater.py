@@ -158,7 +158,7 @@ def staged() -> bool:
 
 
 def apply_on_exit(restart: bool) -> None:
-    """Запустити скрипт, який дочекається закриття програми й скопіює нову версію."""
+    """Запустити встановлення, яке дочекається закриття програми й скопіює нову версію."""
     if source() == "git":
         if restart:
             pythonw = Path(sys.executable).with_name("pythonw.exe")
@@ -167,22 +167,64 @@ def apply_on_exit(restart: bool) -> None:
         return
     if _staged is None:
         return
-    pid = os.getpid()
-    exe = APP_ROOT / f"{version.APP_NAME}.exe"
-    script = STAGE_ROOT / "apply.cmd"
-    lines = [
-        "@echo off",
-        "chcp 65001 >nul",
-        ":wait",
-        f'tasklist /FI "PID eq {pid}" /NH | find " {pid} " >nul && (timeout /t 1 /nobreak >nul & goto wait)',
-        f'robocopy "{_staged}" "{APP_ROOT}" /E /R:5 /W:1 /NFL /NDL /NJH /NJS /NP >nul',
-    ]
+    # Встановлює сама нова версія: її exe лежить у тимчасовій папці, тож не заблокований
+    # копіюванням. Жодних cmd/консолей — раніше скрипт з `tasklist | find` без консолі
+    # відкривав порожнє вікно find і зависав.
+    helper = _staged / f"{version.APP_NAME}.exe"
+    args = [str(helper), "--apply-update", str(_staged), "--target", str(APP_ROOT), "--wait-pid", str(os.getpid())]
     if restart:
-        lines.append(f'start "" "{exe}"')
-    lines.append(f'cd /d "%TEMP%" & rmdir /s /q "{STAGE_ROOT}"')
-    script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
-    subprocess.Popen(["cmd", "/c", str(script)], cwd=str(STAGE_ROOT.parent),
-                     creationflags=_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008)  # DETACHED_PROCESS
+        args.append("--restart")
+    subprocess.Popen(args, cwd=str(STAGE_ROOT), close_fds=True,
+                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008)  # DETACHED_PROCESS
+
+
+def _log(text: str) -> None:
+    try:
+        with open(STAGE_ROOT.parent / "remold-update.log", "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {text}\n")
+    except OSError:
+        pass
+
+
+def apply_staged(src: Path, dst: Path, wait_pid: int, restart: bool) -> int:
+    """Режим `--apply-update`: дочекатися закриття старої програми, скопіювати нові файли
+    поверх папки з exe й за потреби запустити оновлену програму."""
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(0x00100000, False, wait_pid)  # SYNCHRONIZE
+    if handle:
+        kernel32.WaitForSingleObject(handle, 120_000)
+        kernel32.CloseHandle(handle)
+
+    failed = []
+    for file in src.rglob("*"):
+        if not file.is_file():
+            continue
+        target = dst / file.relative_to(src)
+        for attempt in range(40):  # файли можуть ще кілька секунд бути зайняті антивірусом тощо
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(file, target)
+                break
+            except OSError as exc:
+                if attempt == 39:
+                    failed.append(f"{target}: {exc}")
+                time.sleep(0.25)
+    _log(f"applied {src} -> {dst}: {'ok' if not failed else f'{len(failed)} failed'}")
+    for line in failed[:20]:
+        _log("  " + line)
+
+    if restart:
+        exe = dst / f"{version.APP_NAME}.exe"
+        subprocess.Popen([str(exe)], cwd=str(dst), close_fds=True,
+                         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008)
+    return 1 if failed else 0
+
+
+def cleanup_stale() -> None:
+    """Прибрати тимчасову папку попереднього оновлення (після того, як воно встановилось)."""
+    if FROZEN and STAGE_ROOT.exists() and _staged is None:
+        shutil.rmtree(STAGE_ROOT, ignore_errors=True)
 
 
 def due(settings: dict) -> bool:

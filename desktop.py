@@ -389,6 +389,7 @@ class Api:
 
 def _on_start(window, api: Api):
     _bind_drop(window, api)
+    threading.Timer(2.0, updater.cleanup_stale).start()  # залишки щойно встановленого оновлення
     threading.Timer(3.0, api._auto_update).start()
 
 
