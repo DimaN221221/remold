@@ -1,7 +1,7 @@
 # Remold
 
-**A fast, private file converter for Windows** — images, audio, video, documents, spreadsheets and archives.
-Drop files in, pick a format, done. Everything runs locally; nothing is uploaded anywhere.
+**A fast, private file converter for Windows:** images, audio, video, documents, spreadsheets and archives.
+Drop files in, pick a format, done. Everything happens on your computer; nothing is uploaded anywhere.
 
 [Українська версія](README.uk.md)
 
@@ -20,92 +20,67 @@ Drop files in, pick a format, done. Everything runs locally; nothing is uploaded
   | Spreadsheets | csv, tsv, json, xlsx, xml | csv, tsv, json, xlsx, xml, html, md |
   | Archives | zip, tar, tar.gz, tar.bz2, tar.xz | zip, tar, tar.gz, tar.bz2, tar.xz |
 
-- **Real size estimates** — Remold test-compresses the file with your current settings before you convert
-  (images in memory, a 3-second clip for video), so the number you see is close to the real result.
-- **Batch conversion** with per-type rules, parallel workers, progress and cancel.
-- **Explorer integration** — right-click files → *Convert to* → format. The result lands next to the original.
-- **Automatic updates** from GitHub Releases (or `git pull` when running from source), can be turned off.
-- **Ukrainian and English** interface, light and dark themes.
-- ffmpeg is bundled — nothing else to install.
+- **Know the size before you convert.** Remold test-compresses the file with your settings first,
+  so the estimated size is close to the real result.
+- **Many files at once.** Set a default format for each file type, and convert the whole queue in one click,
+  with progress and a Stop button.
+- **Right from Explorer.** Right-click files → *Convert to* → a format. The result appears next to the original.
+- **Automatic updates**, which you can turn off.
+- **English and Ukrainian** interface, light and dark themes.
+- Everything is included — no extra programs to install.
 
-## Download
+## Download and install
 
-Grab `Remold-windows-x64.zip` from the [latest release](../../releases/latest), unzip it anywhere
-and run `Remold.exe`. Keep the `_internal` folder next to the exe. Requires Windows 10/11
-(uses the Edge WebView2 runtime, which is already part of Windows).
+1. Download [Remold-windows-x64.zip](https://github.com/DimaN221221/remold/releases/latest/download/Remold-windows-x64.zip).
+2. Unzip it into any folder you like (for example, *Documents\Remold*).
+3. Run `Remold.exe`. Keep the `_internal` folder next to it — the app needs it.
 
-## Run from source
+Requires Windows 10 or 11 (64-bit).
+If Windows shows *“Windows protected your PC”*, click **More info → Run anyway**: the app is not signed with a paid
+certificate, which is why the warning appears.
 
-```bash
-git clone https://github.com/DimaN221221/remold.git
-```
+All versions and their change notes are on the [Releases](https://github.com/DimaN221221/remold/releases) page.
 
-```bash
-pip install -r requirements.txt
-```
+## Using it
 
-```bash
-python main.py
-```
+1. Drag files or whole folders into the window (or click **Add files**).
+2. Click a file in the queue to choose its format and quality. The estimated size updates as you change them.
+3. Choose where to save: next to the originals or a folder of your choice.
+4. Click **Convert all**. Originals are never changed.
 
-Or double-click `Remold.bat`. A source checkout updates itself with `git pull --ff-only`
-when automatic updates are on.
+Other screens:
 
-## Command line
+- **Batch rules** — the default format for each file type, an output folder and a file name pattern.
+- **History** — everything you've converted; click a row to open the file in Explorer.
+- **Settings** — language, theme, the Explorer menu item, and updates.
 
-```bash
-python main.py video.mp4 -t mp3
-```
+### From Explorer
 
-```bash
-python main.py photo1.heic photo2.heic -t jpg --quality 85 -o converted
-```
+Turn on **Explorer menu** in Settings. Then right-click one or more files → **Convert to** → a format.
+A small window shows the progress, and the result appears in the same folder.
+On Windows 11 the item is under **Show more options** (or Shift + right-click).
 
-```bash
-python main.py --formats document.pdf
-```
+## Good to know
 
-The built `Remold.exe` accepts the same arguments. Other options: `--bitrate 320k`,
-`--video-quality high|medium|low`, `--height 720`, `--register-menu`, `--unregister-menu`.
+- Documents keep their text and basic formatting (headings, lists, bold and italic); pictures and complex
+  layout are not carried over. PDF → DOCX takes the text without the original page layout.
 
-## Building and releasing
+## Updates
 
-```bash
-pip install pyinstaller
-```
+With automatic updates on, Remold checks for a new version at startup and downloads it in the background;
+it installs when you close the app. You can also check manually in **Settings → Check now**.
 
-```bash
-python build.py --zip
-```
+## Privacy
 
-This produces `dist/Remold/Remold.exe` plus `dist/Remold-windows-x64.zip` and its `.sha256`.
+Files are converted on your computer and never uploaded. Remold only goes online to check GitHub for updates,
+and you can turn that off. Settings and history are kept in `%APPDATA%\Remold`.
 
-To publish a release, bump `__version__` in `version.py`, commit, then push a matching tag
-(for example `v2.1.0`). The [release workflow](.github/workflows/release.yml) builds the app on
-GitHub Actions and attaches the zip and checksum to the release. The in-app updater downloads
-that zip, verifies the SHA-256 and installs it when the app closes.
+## Uninstalling
 
-If you fork the project, change `REPO` in `version.py` so updates come from your repository.
+1. In Settings, turn off **Explorer menu** so the *Convert to* item disappears.
+2. Close Remold and delete the folder you unzipped it into.
+3. To remove settings and history as well, delete `%APPDATA%\Remold`.
 
-## Project layout
+---
 
-```
-main.py          entry point (window or command line)
-desktop.py       app backend for the window: queue, workers, settings, updates
-webui/           interface (HTML/CSS/JS), i18n.js holds the UA/EN strings
-core.py          format registry, type detection, output naming, dispatcher
-converters/      images (Pillow), media (ffmpeg), documents (PyMuPDF, python-docx),
-                 data (csv/json/xlsx/xml), archives (zip/tar)
-updater.py       GitHub Releases / git updates
-shell_menu.py    Explorer context menu (HKCU, no admin rights needed)
-quick.py         quick conversion from the context menu with a small progress window
-store.py         settings and history in %APPDATA%\Remold
-i18n.py          strings used by the Python side (menu, progress window, errors)
-version.py       app name, version, update repository
-```
-
-## Notes
-
-- Document conversion keeps text and basic formatting (headings, lists, bold/italic); images and complex
-  layout are not carried over. PDF → DOCX extracts text without the original layout.
-- On Windows 11 the Explorer item is under *Show more options* (or Shift + right-click).
+Running from source, building the app or curious how it works? See [DEVELOPMENT.md](DEVELOPMENT.md).
