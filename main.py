@@ -96,8 +96,17 @@ def main() -> int:
     if args.to:
         return _cli(args)
 
+    # одне вікно на всі запуски: файли з повторних запусків додаються в уже відкрите
+    import instance
+    server = instance.acquire([str(Path(p).resolve()) for p in args.inputs])
+    if server is None:
+        return 0
+
     import desktop
-    desktop.run(args.inputs)
+    try:
+        desktop.run(args.inputs, server)
+    finally:
+        server.close()
     return 0
 
 

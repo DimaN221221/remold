@@ -66,6 +66,7 @@ def main() -> None:
         "--specpath", str(ROOT / "build"),
         "--add-data", f"{ROOT / 'webui'}{sep}webui",
         "--add-data", f"{ROOT / 'assets'}{sep}assets",
+        "--add-data", f"{ROOT / 'changelog.json'}{sep}.",
         # модулі, які імпортуються динамічно
         "--hidden-import", "desktop",
         "--hidden-import", "quick",
@@ -73,6 +74,8 @@ def main() -> None:
         "--hidden-import", "store",
         "--hidden-import", "updater",
         "--hidden-import", "i18n",
+        "--hidden-import", "instance",
+        "--hidden-import", "changelog",
         "--collect-submodules", "converters",
         "--collect-all", "pillow_heif",
         "--collect-all", "pymupdf",

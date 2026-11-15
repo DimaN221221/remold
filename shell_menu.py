@@ -22,16 +22,9 @@ MENU_PREFIX = "Remold.menu."
 # ключі під попередніми назвами програми — прибираються під час реєстрації
 LEGACY = [("Forma", "Forma.menu."), ("Konvertui", "Konvertui.menu.")]
 
-# короткі списки форматів для меню (повний вибір — у вікні програми)
-MENU_REMOLDTS = {
-    "image": ["jpg", "png", "webp", "avif", "pdf", "ico"],
-    "audio": ["mp3", "wav", "flac", "m4a", "ogg"],
-    "video": ["mp4", "mkv", "webm", "gif"],
-    "document": ["pdf", "docx", "txt", "md", "html"],
-    "data": ["xlsx", "csv", "json"],
-    "archive": ["zip", "tar.gz"],
-}
-VIDEO_AUDIO = ["mp3", "wav", "m4a"]  # «лише звук» з відео
+# Windows показує в каскадному меню не більше 16 пунктів; найбільше в нас у відео:
+# 5 відеоформатів + 9 «лише звук» + «Відкрити…» = 15.
+MAX_MENU_ITEMS = 16
 
 
 def _launcher() -> tuple[str, str]:
@@ -55,10 +48,16 @@ def _menu_items(ext: str) -> list[tuple[str, str, bool]]:
     """[(підпис, цільовий формат або "" для «Відкрити…», роздільник перед пунктом)]"""
     cat = core.detect_category(f"x.{ext}")
     src = core.normalize_ext(ext)
-    valid = core.target_formats(f"x.{ext}")
-    items = [(f.upper(), f, False) for f in MENU_REMOLDTS[cat] if f != src and f in valid]
+    # усі формати, які вміє програма (той самий формат не показуємо — це лише перестиснення)
+    targets = [f for f in core.target_formats(f"x.{ext}") if f != src]
     if cat == "video":
-        items += [(t("menu.audioOnly", fmt=f.upper()), f, i == 0) for i, f in enumerate(VIDEO_AUDIO)]
+        video = [f for f in targets if f in core.VIDEO_OUT]
+        audio = [f for f in targets if f not in core.VIDEO_OUT]
+        items = [(f.upper(), f, False) for f in video]
+        items += [(t("menu.audioOnly", fmt=f.upper()), f, i == 0) for i, f in enumerate(audio)]
+    else:
+        items = [(f.upper(), f, False) for f in targets]
+    items = items[:MAX_MENU_ITEMS - 1]
     items.append((t("menu.open"), "", True))
     return items
 

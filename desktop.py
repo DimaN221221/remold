@@ -18,6 +18,7 @@ from pathlib import Path
 import webview
 from webview.dom import DOMEventHandler
 
+import changelog
 import core
 import i18n
 import shell_menu
@@ -31,7 +32,7 @@ WEBUI = APP_DIR / "webui" / "index.html"
 ICON = APP_DIR / "assets" / "icon.ico"
 
 # формати для правил на екрані «Пакетна обробка» (назви типів перекладає інтерфейс)
-RULE_REMOLDTS = {
+RULE_FORMATS = {
     "image": core.IMAGE_OUT,
     "audio": core.AUDIO_OUT,
     "video": core.VIDEO_OUT + ["mp3", "wav", "flac", "m4a"],
@@ -67,6 +68,17 @@ class Api:
         self._settings = store.load_settings()
         self._history: list[dict] = store.load_json(store.HISTORY_FILE, [])
         self._update: dict = {"source": updater.source()}
+        self._ui_lock = threading.Lock()
+        self._ui_ready = False  # інтерфейс уже отримав стан через init()
+        # «Що нового» показується сам один раз після оновлення до нової версії
+        last = self._settings.get("last_seen_version") or ""
+        if not last and (self._settings.get("last_update_check") or self._history):
+            last = "0"  # версії до 2.1.0 не запам'ятовували, яку версію бачив користувач
+        self._show_whats_new = bool(last) and updater.parse_version(last) < updater.parse_version(version.__version__)
+        if last != version.__version__:
+            self.save_settings({"last_seen_version": version.__version__})
+            # нова версія могла змінити пункти меню провідника — перереєструємо їх
+            threading.Thread(target=self._refresh_shell_menu, daemon=True).start()
 
     # --- службове -------------------------------------------------------------
 
@@ -96,13 +108,16 @@ class Api:
     # --- виклики з інтерфейсу -------------------------------------------------
 
     def init(self) -> dict:
+        with self._ui_lock:
+            self._ui_ready = True
+            items = [self._public(it) for it in self._items.values()]
         return {
             "settings": self._settings,
             "history": self._history,
-            "items": [self._public(it) for it in self._items.values()],
-            "categories": {c: {"formats": fmts} for c, fmts in RULE_REMOLDTS.items()},
+            "items": items,
+            "categories": {c: {"formats": fmts} for c, fmts in RULE_FORMATS.items()},
             "lossy": sorted(core.LOSSY_TARGETS),
-            "audioRemoldts": core.AUDIO_OUT,
+            "audioFormats": core.AUDIO_OUT,
             "bitrates": store.BITRATE_STEPS,
             "running": self._running,
             "shellMenu": shell_menu.is_registered(),
@@ -110,7 +125,26 @@ class Api:
             "version": version.__version__,
             "repoUrl": version.REPO_URL,
             "update": self._update,
+            "changelog": changelog.load(),
+            "whatsNew": self._show_whats_new,
         }
+
+    @staticmethod
+    def _refresh_shell_menu() -> None:
+        try:
+            if shell_menu.is_registered():
+                shell_menu.register()
+        except OSError:
+            pass
+
+    def receive_paths(self, paths: list[str]) -> None:
+        """Файли з повторного запуску Remold (кілька файлів з провідника або вже відкрите вікно)."""
+        with self._ui_lock:
+            res = self.add_paths(paths) if paths else None
+            ready = self._ui_ready
+        if ready and res is not None:
+            self._push("dropped", res)
+        _bring_to_front(self._window)
 
     def pick_files(self) -> dict:
         exts = sorted({e for _, lst in core.CATEGORIES.values() for e in lst if "." not in e})
@@ -243,6 +277,13 @@ class Api:
         return self._settings
 
     # --- оновлення ------------------------------------------------------------
+
+    def release_notes(self, ver: str) -> list[dict]:
+        """Список змін нової версії з репозиторію — щоб перед оновленням було видно, що зміниться."""
+        try:
+            return changelog.fetch_remote(ver)
+        except Exception:
+            return []
 
     def check_updates(self) -> dict:
         try:
@@ -409,10 +450,46 @@ def _bind_drop(window, api: Api):
     window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
 
 
-def run(initial_paths: list[str] | None = None) -> None:
+def _bring_to_front(window) -> None:
+    """Показати вікно Remold поверх інших (і розгорнути, якщо згорнуте)."""
+    if window is None:
+        return
+    try:
+        window.restore()
+    except Exception:
+        pass
+    if os.name != "nt":
+        return
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    pid = os.getpid()
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd) and not user32.GetWindow(hwnd, 4):  # GW_OWNER
+            found.append(hwnd)
+        return True
+
+    try:
+        user32.EnumWindows(each, 0)
+        for hwnd in found:
+            if user32.IsIconic(hwnd):
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            user32.SetForegroundWindow(hwnd)
+    except (AttributeError, OSError):
+        pass
+
+
+def run(initial_paths: list[str] | None = None, server=None) -> None:
     api = Api()
     if initial_paths:
         api.add_paths(initial_paths)
+    if server is not None:
+        server.bind(api.receive_paths)
     dark = api._settings["theme"] == "dark"
     window = webview.create_window(
         version.APP_NAME, str(WEBUI), js_api=api,
@@ -422,6 +499,8 @@ def run(initial_paths: list[str] | None = None) -> None:
     api._attach(window)
 
     def on_closing():
+        if server is not None:
+            server.close()  # нові запуски відкриють власне вікно, а не чекатимуть на це
         if api.is_running():
             api.cancel()
         # завантажене автоматично оновлення встановлюється після закриття програми

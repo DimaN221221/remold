@@ -7,10 +7,13 @@ const icon = (name, cls = "sm") => `<svg class="ic ${cls}"><use href="#i-${name}
 
 const state = {
   tab: "conv", items: [], sel: null, settings: {}, history: [], cats: {},
-  lossy: new Set(), audioRemoldts: [], bitrates: [], running: false, rules: {},
+  lossy: new Set(), audioFormats: [], bitrates: [], running: false, rules: {},
   shellMenu: false, version: "", update: { source: "none" }, repoUrl: "",
+  changelog: [], upcoming: { ver: "", entries: null, failed: false },
 };
 let api = null;
+let booted = false;
+const earlyEvents = [];  // події з Python, що прийшли до завершення boot()
 
 const VIDEO_HEIGHTS = [0, 1080, 720, 480];
 const IMAGE_SIZES = [0, 3840, 1920, 1280, 800];
@@ -119,6 +122,7 @@ function renderAll() {
   renderQueue();
   renderPanel();
   renderUpdateBar();
+  renderNotes();
   if (state.tab === "batch") renderBatch();
   if (state.tab === "hist") renderHistory();
 }
@@ -250,7 +254,7 @@ function estKey(it) {
 
 function estNote(it) {
   const tg = it.target;
-  if (state.audioRemoldts.includes(tg) && it.category !== "image") {
+  if (state.audioFormats.includes(tg) && it.category !== "image") {
     if (tg === "wav" || tg === "aiff") return t("est.pcm");
     if (tg === "flac") return t("est.lossless");
     return t("est.kbps", { fmt: tg.toUpperCase(), k: bitrateFor(state.settings.quality) });
@@ -269,7 +273,7 @@ function estimateHtml(it) {
   if (it.category !== "image" && it.duration === 0) return big("—", t("est.noDuration"));
   const key = estKey(it);
   if (!estCache.has(key)) {
-    const slow = it.category === "video" && !state.audioRemoldts.includes(it.target);
+    const slow = it.category === "video" && !state.audioFormats.includes(it.target);
     return big(`<small>${esc(t("est.pending"))}</small>`, slow ? t("est.slow") : "");
   }
   const bytes = estCache.get(key);
@@ -320,9 +324,9 @@ function renderPanel() {
     cell(f.toUpperCase(), f === it.target, `data-fmt="${f}"`, locked)).join("")}</div>`;
   let fmts;
   if (it.category === "video") {
-    fmts = fmtCells(it.formats.filter((f) => !state.audioRemoldts.includes(f)))
+    fmts = fmtCells(it.formats.filter((f) => !state.audioFormats.includes(f)))
       + `<div class="caps"><span>${esc(t("insp.audioOnly"))}</span>${help("audioOnly")}</div>`
-      + fmtCells(it.formats.filter((f) => state.audioRemoldts.includes(f)));
+      + fmtCells(it.formats.filter((f) => state.audioFormats.includes(f)));
   } else {
     fmts = fmtCells(it.formats);
   }
@@ -335,11 +339,11 @@ function renderPanel() {
 
   if (state.lossy.has(it.target)) {
     const q = state.settings.quality;
-    const qTip = state.audioRemoldts.includes(it.target) ? "quality_audio" : `quality_${it.category === "video" ? "video" : "image"}`;
+    const qTip = state.audioFormats.includes(it.target) ? "quality_audio" : `quality_${it.category === "video" ? "video" : "image"}`;
     html += `<div class="sec"><div class="caps"><span>${esc(t("insp.quality"))}</span>${help(qTip)}<span class="val" id="q-val">${q}%</span></div>
       <input type="range" min="10" max="100" value="${q}" id="q-range" style="--p:${((q - 10) / 90) * 100}%"></div>`;
   }
-  if (it.category === "video" && !state.audioRemoldts.includes(it.target) && it.target !== "gif") {
+  if (it.category === "video" && !state.audioFormats.includes(it.target) && it.target !== "gif") {
     html += `<div class="sec"><div class="caps"><span>${esc(t("insp.resolution"))}</span>${help("resolution")}</div>${dims}
       <div class="cells">${VIDEO_HEIGHTS.map((v) => cell(v ? `${v}p` : t("insp.original"), state.settings.video_height === v, `data-vh="${v}"`)).join("")}</div></div>`;
   }
@@ -454,16 +458,17 @@ function renderUpdateBar() {
   if (!show) return;
   $("#update-text").textContent = u.ready ? t(u.source === "git" ? "upd.readyGit" : "upd.ready", { v: u.latest }) : t("upd.available", { v: u.latest });
   $("#update-go").textContent = u.ready ? t("upd.restart") : t("upd.install");
+  $("#update-notes").hidden = !upcomingVer();
 }
 
 async function installUpdate() {
   const u = state.update;
   if (u.ready) return api.restart_to_update();
   Object.assign(u, { busy: "install", error: "" });
-  renderSettings(); renderUpdateBar();
+  renderSettings(); renderUpdateBar(); renderNotes();
   const res = await api.install_update();
   Object.assign(state.update, res, { busy: false });
-  renderSettings(); renderUpdateBar();
+  renderSettings(); renderUpdateBar(); renderNotes();
 }
 
 async function checkUpdates() {
@@ -474,10 +479,85 @@ async function checkUpdates() {
   renderSettings(); renderUpdateBar();
 }
 
+// --- Що нового (список змін) ---------------------------------------------------------
+
+function fmtDay(iso) {
+  const d = new Date(`${iso}T12:00:00`);
+  if (isNaN(d)) return esc(iso);
+  return d.toLocaleDateString(LANG === "uk" ? "uk-UA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function notesEntryHtml(e, badge) {
+  const groups = ["new", "improved", "fix"].map((kind) => {
+    const items = e.changes.filter((c) => c.type === kind);
+    if (!items.length) return "";
+    return `<div class="n-group"><span class="n-kind ${kind}">${t(`notes.${kind}`)}</span>
+      <ul>${items.map((c) => `<li>${esc(c[LANG] || c.en || c.uk)}</li>`).join("")}</ul></div>`;
+  }).join("");
+  const tag = badge ? `<span class="n-badge ${badge}">${t(`notes.${badge}`)}</span>` : "";
+  return `<article class="n-ver"><div class="n-head"><b class="num">${esc(e.version)}</b>${tag}
+    <span class="n-date">${e.date ? fmtDay(e.date) : ""}</span></div>${groups}</article>`;
+}
+
+function renderNotes() {
+  const box = $("#notes");
+  if (box.hidden) return;
+  const up = state.upcoming;
+  let html = "";
+  if (up.ver) {
+    if (up.entries === null) html += `<p class="n-info">${t("notes.loading")}</p>`;
+    else if (up.failed || !up.entries.length) html += `<p class="n-info">${t("notes.remoteFail", { v: esc(up.ver) })}</p>`;
+    else html += up.entries.map((e, i) => notesEntryHtml(e, i === 0 ? "upcoming" : "")).join("");
+  }
+  html += state.changelog.length
+    ? state.changelog.map((e) => notesEntryHtml(e, e.version === state.version ? "current" : "")).join("")
+    : `<p class="n-info">${t("notes.empty")}</p>`;
+  $("#notes-body").innerHTML = html;
+  $("#notes-sub").textContent = box.dataset.mode === "updated"
+    ? t("notes.updated", { v: state.version }) : t("notes.sub", { v: state.version });
+
+  const u = state.update;
+  const foot = $("#notes-foot");
+  if (up.ver && (u.available || u.ready) && !u.busy) {
+    foot.innerHTML = `<button class="btn ghost" data-act="close">${t("upd.later")}</button>` +
+      `<button class="btn primary" data-act="install">${icon("refresh")}<span>${u.ready ? t("upd.restart") : t("set.install")}</span></button>`;
+  } else {
+    foot.innerHTML = `<button class="btn ghost" data-act="close">${t("notes.ok")}</button>`;
+  }
+}
+
+async function openNotes({ mode = "", upcoming = "" } = {}) {
+  hideTip();
+  const box = $("#notes");
+  box.dataset.mode = mode;
+  box.hidden = false;
+  const up = state.upcoming;
+  if (!upcoming) Object.assign(up, { ver: "", entries: null, failed: false });
+  else if (up.ver !== upcoming || up.failed) Object.assign(up, { ver: upcoming, entries: null, failed: false });
+  renderNotes();
+  $("#notes-close").focus();
+  $("#notes-body").scrollTop = 0;
+  if (upcoming && up.entries === null) {
+    let entries = [];
+    try { entries = await api.release_notes(upcoming); } catch (_) { entries = []; }
+    if (up.ver !== upcoming) return;
+    Object.assign(up, { entries: entries || [], failed: !entries || !entries.length });
+    renderNotes();
+  }
+}
+
+function closeNotes() {
+  $("#notes").hidden = true;
+}
+
+// оновлення з GitHub Releases має номер версії; у git-копії «latest» — це хеш коміту
+const upcomingVer = () => (state.update.source === "release" && (state.update.available || state.update.ready) ? state.update.latest : "");
+
 // --- Події з Python ----------------------------------------------------------------
 
 window.app = {
   onEvent(kind, data) {
+    if (!booted) { earlyEvents.push([kind, data]); return; }
     if (kind === "item") {
       const it = itemById(data.id);
       if (!it) return;
@@ -512,7 +592,7 @@ window.app = {
       addItems(data);
     } else if (kind === "update") {
       Object.assign(state.update, data);
-      renderSettings(); renderUpdateBar();
+      renderSettings(); renderUpdateBar(); renderNotes();
     }
   },
 };
@@ -549,6 +629,18 @@ function wire() {
   $("#update-go").onclick = installUpdate;
   $("#update-later").onclick = () => { state.update.dismissed = true; renderUpdateBar(); };
   $("#btn-repo").onclick = () => api.open_repo();
+  const notes = () => openNotes({ upcoming: upcomingVer() });
+  $("#update-notes").onclick = notes;
+  $("#btn-notes").onclick = notes;
+  $("#ver").onclick = notes;
+  $("#notes-close").onclick = closeNotes;
+  $("#notes").addEventListener("mousedown", (e) => { if (e.target.id === "notes") closeNotes(); });
+  $("#notes-foot").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "close") closeNotes();
+    else if (b.dataset.act === "install") await installUpdate();
+  });
 
   const pick = async () => addItems(await api.pick_files());
   $("#dropzone").onclick = pick;
@@ -672,6 +764,10 @@ function wire() {
   document.addEventListener("drop", (e) => { e.preventDefault(); depth = 0; setDrag(false); });
 
   document.addEventListener("keydown", (e) => {
+    if (!$("#notes").hidden) {
+      if (e.key === "Escape") { e.preventDefault(); closeNotes(); }
+      return;  // поки відкрито «Що нового», гарячі клавіші черги не працюють
+    }
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
     if (e.ctrlKey && e.key === "o") { e.preventDefault(); pick(); return; }
     if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); run(); return; }
@@ -694,14 +790,18 @@ async function boot(apiImpl) {
   const d = await api.init();
   Object.assign(state, {
     settings: d.settings, history: d.history, items: d.items, cats: d.categories,
-    lossy: new Set(d.lossy), audioRemoldts: d.audioRemoldts, bitrates: d.bitrates, running: d.running,
+    lossy: new Set(d.lossy), audioFormats: d.audioFormats, bitrates: d.bitrates, running: d.running,
     shellMenu: !!d.shellMenu, version: d.version, update: { ...d.update }, repoUrl: d.repoUrl,
+    changelog: d.changelog || [],
   });
   LANG = d.lang;
   state.sel = state.items.length ? state.items[0].id : null;
   wire();
   setTab("conv");
   renderAll();
+  booted = true;
+  earlyEvents.splice(0).forEach(([kind, data]) => window.app.onEvent(kind, data));
+  if (d.whatsNew) openNotes({ mode: "updated" });
 }
 
 window.addEventListener("pywebviewready", () => boot(window.pywebview.api));

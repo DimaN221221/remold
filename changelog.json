@@ -1,0 +1,66 @@
+[
+  {
+    "version": "2.1.0",
+    "date": "2026-11-15",
+    "changes": [
+      {
+        "type": "fix",
+        "uk": "Кілька файлів, відкритих з провідника через «Відкрити в Remold…», тепер потрапляють в одне вікно, а не кожен у своє.",
+        "en": "Several files opened from Explorer with “Open in Remold…” now land in one window instead of one window each."
+      },
+      {
+        "type": "improved",
+        "uk": "Якщо Remold уже відкритий, нові файли з провідника додаються в його чергу, а вікно виходить на передній план.",
+        "en": "If Remold is already open, new files from Explorer are added to its queue and the window comes to the front."
+      },
+      {
+        "type": "fix",
+        "uk": "Меню «Конвертувати в» показує всі доступні формати, а не лише чотири-п'ять: для відео тепер є AVI, MOV і всі аудіоформати.",
+        "en": "The “Convert to” menu lists every available format instead of four or five: videos now offer AVI, MOV and every audio format."
+      },
+      {
+        "type": "new",
+        "uk": "Список змін: що нового в кожній версії видно в «Налаштуваннях», а після оновлення він відкривається сам.",
+        "en": "Changelog: see what changed in each version from Settings; it also opens on its own after an update."
+      },
+      {
+        "type": "new",
+        "uk": "Перед встановленням оновлення можна подивитися, що в ньому зміниться.",
+        "en": "Before installing an update you can see what it changes."
+      }
+    ]
+  },
+  {
+    "version": "2.0.2",
+    "date": "2026-10-26",
+    "changes": [
+      {
+        "type": "fix",
+        "uk": "Оновлення більше не зависає під час перезапуску: нова версія встановлюється сама, без вікон консолі.",
+        "en": "Updates no longer hang on restart: the new version installs itself, with no console windows."
+      }
+    ]
+  },
+  {
+    "version": "2.0.1",
+    "date": "2026-10-26",
+    "changes": [
+      {
+        "type": "improved",
+        "uk": "Нове віконце швидкої конвертації з меню провідника: формат «звідки → куди», розмір до і після, посилання «Показати в папці» та зрозуміла причина помилки.",
+        "en": "Redesigned quick-convert popup from the Explorer menu: source → target format, size before and after, a “Show in folder” link and a clear reason on errors."
+      }
+    ]
+  },
+  {
+    "version": "2.0.0",
+    "date": "2026-10-26",
+    "changes": [
+      {
+        "type": "new",
+        "uk": "Перший випуск Remold: конвертація зображень, аудіо, відео, документів, таблиць та архівів, пакетна обробка, історія, пункт «Конвертувати в» у меню провідника й автоматичні оновлення.",
+        "en": "First Remold release: converts images, audio, video, documents, spreadsheets and archives, with batch rules, history, “Convert to” in the Explorer menu and automatic updates."
+      }
+    ]
+  }
+]

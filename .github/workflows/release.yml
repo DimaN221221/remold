@@ -29,6 +29,9 @@ jobs:
           $v = python -c "import version; print(version.__version__)"
           if ("v$v" -ne "${{ github.ref_name }}") { throw "Tag ${{ github.ref_name }} does not match version.py ($v)" }
 
+      - name: Release notes from changelog.json
+        run: python changelog.py --release-notes "${{ github.ref_name }}" > dist-notes.md
+
       - name: Build
         run: python build.py --zip
 
@@ -37,4 +40,4 @@ jobs:
           files: |
             dist/Remold-windows-x64.zip
             dist/Remold-windows-x64.zip.sha256
-          generate_release_notes: true
+          body_path: dist-notes.md

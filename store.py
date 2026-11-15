@@ -28,6 +28,7 @@ DEFAULT_SETTINGS = {
     "image_max_size": 0,
     "auto_update": True,
     "last_update_check": 0,
+    "last_seen_version": "",             # для «Що нового» після оновлення
     "rules": {"image": "jpg", "audio": "mp3", "video": "mp4",
               "document": "pdf", "data": "xlsx", "archive": "zip"},
 }

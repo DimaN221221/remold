@@ -58,7 +58,15 @@ const I18N = {
 
     "upd.ready": "Оновлення {v} завантажено.", "upd.readyGit": "Код оновлено до {v}.",
     "upd.restart": "Перезапустити", "upd.later": "Пізніше", "upd.available": "Доступна версія {v}.",
-    "upd.install": "Оновити",
+    "upd.install": "Оновити", "upd.notes": "Що нового?",
+
+    "notes.title": "Що нового", "notes.open": "Що нового", "notes.close": "Закрити",
+    "notes.sub": "Remold {v}", "notes.updated": "Remold оновлено до {v}",
+    "notes.current": "встановлено", "notes.upcoming": "доступна",
+    "notes.new": "Нове", "notes.improved": "Покращено", "notes.fix": "Виправлено",
+    "notes.empty": "Список змін недоступний.", "notes.loading": "Завантажую список змін…",
+    "notes.remoteFail": "Не вдалося завантажити зміни версії {v}.",
+    "notes.ok": "Зрозуміло",
 
     "toast.skipped": "Непідтримуваний формат — пропущено {files}: {names}",
     "toast.more": " і ще {n}", "toast.addFirst": "Спочатку додайте файли в чергу.",
@@ -142,7 +150,15 @@ const I18N = {
 
     "upd.ready": "Update {v} is downloaded.", "upd.readyGit": "Code updated to {v}.",
     "upd.restart": "Restart", "upd.later": "Later", "upd.available": "Version {v} is available.",
-    "upd.install": "Update",
+    "upd.install": "Update", "upd.notes": "What's new?",
+
+    "notes.title": "What's new", "notes.open": "What's new", "notes.close": "Close",
+    "notes.sub": "Remold {v}", "notes.updated": "Remold was updated to {v}",
+    "notes.current": "installed", "notes.upcoming": "available",
+    "notes.new": "New", "notes.improved": "Improved", "notes.fix": "Fixed",
+    "notes.empty": "The changelog isn't available.", "notes.loading": "Loading the changelog…",
+    "notes.remoteFail": "Couldn't load the changes in {v}.",
+    "notes.ok": "Got it",
 
     "toast.skipped": "Unsupported format — skipped {files}: {names}",
     "toast.more": " and {n} more", "toast.addFirst": "Add some files to the queue first.",
